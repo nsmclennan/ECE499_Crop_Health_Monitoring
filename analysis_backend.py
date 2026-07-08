@@ -90,11 +90,11 @@ def run_openai(filepath:str, metadata: dict, message: str) -> dict:
                     }
                 ]
             }],
-            tools=[{
-                "type": "file_search",
-                "vector_store_ids": [os.getenv("OPENAI_VECTOR_STORE_ID")],
-                "max_num_results": OPENAI_VECTOR_STORE_ITEMS 
-                }],
+            # tools=[{
+            #     "type": "file_search",
+            #     "vector_store_ids": [os.getenv("OPENAI_VECTOR_STORE_ID")],
+            #     "max_num_results": OPENAI_VECTOR_STORE_ITEMS 
+            #     }],
             store=True,
         )
         
