@@ -1,0 +1,220 @@
+{% extends 'base.html' %}
+{% set step = 3 %}
+{% block title %}Bubble Map{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<style>
+  .leaflet-popup-content-wrapper{
+    background:var(--color-surface);color:var(--color-text);
+    border:1px solid var(--color-border);border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-lg)
+  }
+  .leaflet-popup-tip{background:var(--color-surface)}
+  .leaflet-popup-content{margin:10px 14px;font-family:var(--font-body);font-size:14px}
+  .popup-title{font-weight:600;margin-bottom:4px}
+  .popup-sev{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+  .popup-coords{font-size:11px;color:var(--color-text-muted);margin-top:4px}
+  .popup-link{display:inline-block;margin-top:8px;font-size:12px;font-weight:600;
+    color:var(--color-primary);cursor:pointer;text-decoration:underline}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:var(--space-4);">
+  <div class="map-legend" style="margin-bottom:0;">
+    <div class="legend-item"><div class="legend-dot dot-unknown"></div> {{statistics.severity.uncertain.count}} Uncertain ({{statistics.severity.uncertain.percent}}%)</div>
+    <div class="legend-item"><div class="legend-dot dot-low"></div> {{statistics.severity.low.count}} Low ({{ statistics.severity.low.percent}}%)</div>
+    <div class="legend-item"><div class="legend-dot dot-medium"></div> {{statistics.severity.medium.count}} Medium ({{statistics.severity.medium.percent}}%)</div>
+    <div class="legend-item"><div class="legend-dot dot-high"></div> {{statistics.severity.high.count}} High ({{statistics.severity.high.percent}}%)</div>
+    <div class="legend-item"><div class="legend-dot dot-critical"></div> {{statistics.severity.critical.count}} Critical ({{statistics.severity.critical.percent}}%)</div>
+  </div>
+
+
+</div>
+
+
+<div id="map-outer">
+  <div id="map-container"></div>
+  <div class="no-map-state" id="no-results-state" style="display:none">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+      <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+    </svg>
+    <div>
+      <p style="font-weight:600;margin-bottom:var(--space-2)">No results to display</p>
+      <a href="/analyze" class="btn btn-primary btn-sm">Run Analysis First</a>
+    </div>
+  </div>
+</div>
+
+<div id="photo-detail-panel" role="complementary" aria-label="Photo details" aria-hidden="true">
+  <button id="panel-close" class="btn btn-ghost btn-sm" aria-label="Close panel"
+          style="position:absolute;top:var(--space-4);right:var(--space-4)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+    Close
+  </button>
+  <h2 style="font-size:var(--text-lg);margin-bottom:var(--space-4);padding-right:80px" id="panel-title">Photo</h2>
+  <img id="panel-img" class="panel-img" src="" alt="" loading="lazy" width="320" height="240">
+  <div id="panel-rows"></div>
+</div>
+
+
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+const SEV_COLORS = {
+  low:'#437a22', medium:'#d19900', high:'#da7101', critical:'#a13544', unknown:'#7a7974', uncertain:'#7a7974'
+};
+let map, results = [];
+
+async function init() {
+  const r = await fetch('/api/results');
+  const d = await r.json();
+  results = d.results || [];
+
+  if(!results.length) {
+    document.getElementById('map-container').style.display = 'none';
+    document.getElementById('no-results-state').style.display = 'flex';
+    return;
+  }
+
+  const valid = results.filter(r => r.location && (r.location.lat !== 0 || r.location.lng !== 0));
+  const center = valid.length
+    ? [valid.reduce((s,r)=>s+r.location.lat,0)/valid.length,
+       valid.reduce((s,r)=>s+r.location.lng,0)/valid.length]
+    : [20, 0];
+  const zoom = valid.length ? 10 : 2;
+
+  map = L.map('map-container', {center, zoom});
+  setTiles(false);
+
+  new MutationObserver(() => {
+    setTiles(document.documentElement.getAttribute('data-theme') === 'dark');
+  }).observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});
+
+  let zeroIdx = 0;
+  results.forEach((res, idx) => {
+    let lat = res.location?.lat ?? 0;
+    let lng = res.location?.lng ?? 0;
+    if(lat === 0 && lng === 0) {
+      const cols = 10, spread = 0.015;
+      lat = Math.floor(zeroIdx / cols) * spread;
+      lng = (zeroIdx % cols) * spread * 1.5 - (cols * spread * 1.5 / 2);
+      zeroIdx++;
+    }
+    const color  = SEV_COLORS[(res.severity||'').toLowerCase()] || SEV_COLORS.unknown;
+    const radius = {critical:18,high:14,medium:10,low:8}[(res.severity||'').toLowerCase()] || 8;
+    const circle = L.circleMarker([lat, lng], {
+      radius, color:'#fff', weight:2, fillColor:color, fillOpacity:0.85
+    }).addTo(map);
+    circle.bindPopup(`
+      <div class="popup-title">${res.original_name}</div>
+      <div class="popup-sev" style="color:${color}">${(res.severity||'unknown').toUpperCase()}</div>
+      <div class="popup-coords">${lat.toFixed(5)}, ${lng.toFixed(5)}</div>
+      <span class="popup-link" data-idx="${idx}">View details →</span>`);
+    circle.on('popupopen', () => {
+      setTimeout(() => {
+        document.querySelectorAll(`.popup-link[data-idx="${idx}"]`).forEach(el =>
+          el.addEventListener('click', () => openPanel(idx)));
+      }, 50);
+    });
+  });
+}
+
+function setTiles(dark) {
+  if(window._tile) window._tile.remove();
+  window._tile = L.tileLayer(
+    dark ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+         : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { attribution: dark
+        ? '© <a href="https://www.openstreetmap.org/copyright">OSM</a> © <a href="https://carto.com/">Carto</a>'
+        : '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom:19 }
+  ).addTo(map);
+}
+
+function openPanel(idx) {
+  const res   = results[idx];
+  const panel = document.getElementById('photo-detail-panel');
+  document.getElementById('panel-title').textContent = res.original_name;
+  const img = document.getElementById('panel-img');
+  img.src = res.photo_url || ''; img.alt = res.original_name;
+  const color = SEV_COLORS[(res.severity||'').toLowerCase()] || SEV_COLORS.unknown;
+  const lat   = res.location?.lat?.toFixed(6) ?? '—';
+  const lng   = res.location?.lng?.toFixed(6) ?? '—';
+  document.getElementById('panel-rows').innerHTML = `
+    <div class="panel-row">
+      <span class="panel-row-label">Severity</span>
+      <span class="panel-row-value" style="color:${color};font-weight:700">${(res.severity||'unknown').toUpperCase()}</span>
+    </div>
+    <div class="panel-row">
+      <span class="panel-row-label">Latitude</span>
+      <span class="panel-row-value" style="font-variant-numeric:tabular-nums">${lat}</span>
+    </div>
+    <div class="panel-row">
+      <span class="panel-row-label">Longitude</span>
+      <span class="panel-row-value" style="font-variant-numeric:tabular-nums">${lng}</span>
+    </div>
+    ${panelRow('Temperature (C)', res.temperature)}
+    ${panelRow('Humidity (%)', res.humidity)}
+    ${panelRow('Pressure (hPA)', res.pressure)}
+
+    <div class="panel-row" style="flex-direction:column;align-items:flex-start;gap:var(--space-2)">
+      <span class="panel-row-label">Recommended Action</span>
+      <span class="panel-row-value" style="font-size:var(--text-xs);line-height:1.5">${res.recommended_action||'—'}</span>
+    </div>
+    <div class="panel-row" style="flex-direction:column;align-items:flex-start;gap:var(--space-2)">
+      <span class="panel-row-label">Affected Regions</span>
+      ${renderNotes(res.affected_regions)}
+    </div>
+    <div class="panel-row" style="flex-direction:column;align-items:flex-start;gap:var(--space-2)">
+      <span class="panel-row-label">Alternative Explanations</span>
+      ${renderNotes(res.alternative_explanations)}
+    </div>
+    <div class="panel-row" style="flex-direction:column;align-items:flex-start;gap:var(--space-2)">
+      <span class="panel-row-label">Notes</span>
+      <span class="panel-row-value" style="font-size:var(--text-xs);line-height:1.5">${res.notes||'—'}</span>
+    </div>`;
+  panel.classList.add('open');
+  panel.setAttribute('aria-hidden','false');
+}
+
+
+function renderNotes(notes) {
+  if (!notes || (Array.isArray(notes) && notes.length === 0)) return '—';
+  
+  if (Array.isArray(notes)) {
+    return `<div class="upload-badge">
+      ${notes.map(n => `<span>${n}</span>`).join('')}
+    </div>`;
+  }
+  
+  return notes;
+}
+
+document.getElementById('panel-close').addEventListener('click', () => {
+  const p = document.getElementById('photo-detail-panel');
+  p.classList.remove('open');
+  p.setAttribute('aria-hidden','true');
+});
+
+
+
+function panelRow(label, value, extraStyle = '') {
+  if (value === null || value === undefined || value === '') return '';
+  return `
+    <div class="panel-row" style="${extraStyle}">
+      <span class="panel-row-label">${label}</span>
+      <span class="panel-row-value">${value}</span>
+    </div>`;
+}
+
+init();
+</script>
+{% endblock %}

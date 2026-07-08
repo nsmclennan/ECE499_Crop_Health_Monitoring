@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+{% set step = 2 %}
+{% block title %}Analyze{% endblock %}
+{% block content %}
+
+
+<div class="analyze-card">
+  <label for="analysis-message">Analysis Instructions</label>
+  <textarea class="msg-input" id="analysis-message" rows="5">{{default_analysis_message}}</textarea>
+</div>
+
+<div class="progress-wrap" id="progress-wrap">
+  <div class="progress-bar-track"><div class="progress-bar-fill" id="progress-bar"></div></div>
+  <div class="progress-label" id="progress-label">Analyzing…</div>
+</div>
+
+<div id="results-section" style="display:none">
+  <div class="result-list" id="result-list"></div>
+</div>
+
+<div class="empty-state" id="no-photos-state" style="display:none">
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+    <line x1="12" y1="16" x2="12.01" y2="16"/>
+  </svg>
+  <p>No photos loaded. <a href="/upload">Go back to Upload</a></p>
+</div>
+
+<div class="action-row" id="action-row">
+  <button class="btn btn-primary" id="btn-analyze">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+    Run Analysis
+  </button>
+  <a href="/confirm" class="btn btn-secondary">← Back</a>
+  <a href="/map" class="btn btn-ghost" id="btn-map" style="display:none">View Map →</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const btnAnalyze   = document.getElementById('btn-analyze');
+const progressWrap = document.getElementById('progress-wrap');
+const progressBar  = document.getElementById('progress-bar');
+const progressLbl  = document.getElementById('progress-label');
+const resultSec    = document.getElementById('results-section');
+const resultList   = document.getElementById('result-list');
+const btnMap       = document.getElementById('btn-map');
+const SEV = {low:'sev-low',medium:'sev-medium',high:'sev-high',critical:'sev-critical'};
+
+(async () => {
+  const r = await fetch('/api/photos');
+  const d = await r.json();
+  if(!d.photos || !d.photos.length) {
+    document.getElementById('action-row').style.display = 'none';
+    document.getElementById('no-photos-state').style.display = 'flex';
+  }
+  const rr = await fetch('/api/results');
+  const dd = await rr.json();
+  if(dd.results && dd.results.length) renderResults(dd.results);
+})();
+
+btnAnalyze.addEventListener('click', async () => {
+  const message = document.getElementById('analysis-message').value.trim();
+  btnAnalyze.disabled = true;
+  progressWrap.style.display = 'block';
+  resultSec.style.display = 'none';
+  resultList.innerHTML = '';
+  simulateProgress();
+  try {
+    const r  = await fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})});
+    const d  = await r.json();
+    if(d.error){ showToast(d.error,'error'); return; }
+    const rr = await fetch('/api/results');
+    const dd = await rr.json();
+    renderResults(dd.results || []);
+    showToast(`Analysis complete — ${d.count} photo${d.count===1?'':'s'} processed`,'success');
+  } catch(e){ showToast('Analysis failed: '+e.message,'error'); }
+  finally{ btnAnalyze.disabled = false; progressWrap.style.display = 'none'; }
+});
+
+function simulateProgress(){
+  let pct=0;
+  const id=setInterval(()=>{
+    pct=Math.min(pct+Math.random()*8,92);
+    progressBar.style.width=pct+'%';
+    progressLbl.textContent=`Analyzing… ${Math.round(pct)}%`;
+    if(pct>=92)clearInterval(id);
+  },250);
+}
+
+function renderResults(results){
+  progressBar.style.width='100%';
+  progressLbl.textContent='Done';
+  resultSec.style.display='block';
+  resultList.innerHTML='';
+  results.forEach(r=>{
+    const cls=SEV[(r.severity||'').toLowerCase()]||'sev-unknown';
+    const el=document.createElement('div');
+    el.className='result-item';
+    el.innerHTML=`<div class="result-item-name">${r.original_name}</div>
+      <span class="severity-badge ${cls}">${r.severity||'unknown'}</span>`;
+    resultList.appendChild(el);
+  });
+  btnMap.style.display='inline-flex';
+}
+
+
+</script>
+{% endblock %}

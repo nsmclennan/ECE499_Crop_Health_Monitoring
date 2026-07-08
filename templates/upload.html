@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% set step = 1 %}
+{% block title %}Upload Photos{% endblock %}
+{% block content %}
+
+<div class="upload-zone" id="upload-zone" role="button" tabindex="0"
+     aria-label="Click or drag photos here to upload">
+  <h2>Upload images here</h2>
+
+  <input type="file" id="file-input" multiple accept="image/*" style="display:none">
+</div>
+
+<div class="upload-list" id="upload-list"></div>
+
+<div class="action-row" id="action-row" style="display:none">
+  <button class="btn btn-primary" id="btn-continue">
+    Continue to Analysis
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+      <polyline points="9 18 15 12 9 6"/>
+    </svg>
+  </button>
+  <button class="btn btn-ghost" id="btn-clear">Clear all</button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const zone        = document.getElementById('upload-zone');
+const fileInput   = document.getElementById('file-input');
+const listEl      = document.getElementById('upload-list');
+const actionRow   = document.getElementById('action-row');
+const btnClear    = document.getElementById('btn-clear');
+const btnContinue = document.getElementById('btn-continue');
+
+(async () => {
+  const r = await fetch('/api/photos');
+  const d = await r.json();
+  if(d.photos && d.photos.length) {
+    d.photos.forEach(p => addItem(p.original_name, p.url, 'ok'));
+    actionRow.style.display = 'flex';
+  }
+})();
+
+zone.addEventListener('click', () => fileInput.click());
+zone.addEventListener('keydown', e => { if(e.key==='Enter'||e.key===' ') fileInput.click(); });
+zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('drag-over'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+zone.addEventListener('drop', e => {
+  e.preventDefault(); zone.classList.remove('drag-over');
+  uploadFiles([...e.dataTransfer.files]);
+});
+fileInput.addEventListener('change', () => uploadFiles([...fileInput.files]));
+
+async function uploadFiles(files) {
+  if(!files.length) return;
+  const form = new FormData();
+  files.forEach(f => form.append('photos', f));
+  files.forEach(f => addItem(f.name, null, 'uploading'));
+  try {
+    const r  = await fetch('/api/upload', {method:'POST', body:form});
+    const d  = await r.json();
+    if(d.error){ showToast(d.error,'error'); return; }
+    listEl.innerHTML = '';
+    const r2 = await fetch('/api/photos');
+    const d2 = await r2.json();
+    d2.photos.forEach(p => addItem(p.original_name, p.url, 'ok'));
+    actionRow.style.display = 'flex';
+    showToast(`Added ${d.added} photo${d.added===1?'':'s'}`, 'success');
+  } catch(e) { showToast('Upload failed — check server.','error'); }
+}
+
+function addItem(name, url, status) {
+  const el = document.createElement('div');
+  el.className = 'upload-item';
+  const img = (url && status==='ok')
+    ? `<img src="${url}" class="upload-item-thumb" alt="" loading="lazy" width="40" height="40">`
+    : `<div class="upload-item-thumb"></div>`;
+  const s = status==='ok'
+    ? `<span class="upload-item-status status-ok">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+        Uploaded</span>`
+    : `<span class="upload-item-status" style="color:var(--color-text-faint)">…uploading</span>`;
+  el.innerHTML = `${img}<div class="upload-item-info"><div class="upload-item-name">${name}</div></div>${s}`;
+  listEl.appendChild(el);
+}
+
+btnClear.addEventListener('click', async () => {
+  await fetch('/api/clear',{method:'POST'});
+  listEl.innerHTML = '';
+  actionRow.style.display = 'none';
+  showToast('Cleared all photos','info');
+});
+btnContinue.addEventListener('click', () => window.location.href='/analyze');
+</script>
+{% endblock %}

@@ -1,0 +1,25 @@
+System prompt:
+You are an agricultural image inspection assistant.
+Analyze tree images for visible signs of powdery mildew.
+Base your answer only on what is visible in the image.
+If evidence is weak or ambiguous, say "uncertain".
+Return valid JSON only.
+
+User prompt:
+Task: Check this tree image for powdery mildew.
+
+Look for visible cues such as:
+- White or gray powdery coating on leaves, shoots, or fruit
+- Patchy surface growth consistent with mildew
+- Leaf curling, distortion, or affected clusters if visible
+
+Return this JSON schema:
+{
+  "powdery_mildew_detected": true|false|null,
+  "confidence": 0.0-1.0,
+  "severity": "low|medium|high|uncertain",
+  "evidence": ["short visual observations"],
+  "affected_regions": ["leaf", "shoot", "fruit", "unknown"],
+  "alternative_explanations": ["dust", "lighting glare", "other fungus", "none"],
+  "recommended_action": "one short sentence"
+}
