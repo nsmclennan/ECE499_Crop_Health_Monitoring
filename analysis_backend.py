@@ -4,7 +4,7 @@ import os
 import base64
 
 from PIL import Image
-from PIL.ExifTags import TAGS, GPSTAGS
+from PIL.ExifTags import TAGS, GPSTAGS, IFD
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -27,6 +27,19 @@ OPENAI_API_MODEL = "gpt-5.4-mini"
 OPENAI_VECTOR_STORE_ITEMS = 2
 
 
+def decode_exif_bytes(raw_comment):
+    """Remove starting bytes for json string"""
+    if not isinstance(raw_comment, bytes):
+        return ""
+        
+    if raw_comment.startswith(b'ASCII\x00\x00\x00') or raw_comment.startswith(b'UNICODE\x00'):
+        clean_bytes = raw_comment[8:]
+    else:
+        clean_bytes = raw_comment
+        
+    return clean_bytes.decode('utf-8', errors='ignore').strip()
+
+
 def get_photo_metadata(filepath: str) -> list[float]:
     """
     Obtain all metadata injected into image from hardware team. 
@@ -38,8 +51,13 @@ def get_photo_metadata(filepath: str) -> list[float]:
     with Image.open(filepath) as img:
         exif = img.getexif()
         gps_info = exif.get_ifd(EXIF_GPS_ID)
-        # Optional metadata.
-        try: user_comment = exif.get_ifd(EXIF_USER_COMMENT_ID)
+
+        exif_ifd = exif.get_ifd(IFD.Exif)
+
+        try:
+            user_comment = exif_ifd.get(EXIF_USER_COMMENT_ID)
+
+            user_comment = decode_exif_bytes(user_comment)
         except: pass
 
     if not gps_info or 2 not in gps_info or 4 not in gps_info:
@@ -72,7 +90,7 @@ def run_openai(filepath:str, metadata: dict, message: str) -> dict:
         for param in VALID_SENSOR_DATA:
             param_value = metadata.get(param)
             if param_value is not None:
-                sensor_data = sensor_data + f"{param}: {paramvalue}\n"
+                sensor_data = sensor_data + f"{param}: {param_value}\n"
 
         if sensor_data:
             sensor_data = f"\n\nAlso use additional sensor data:\n" + sensor_data
