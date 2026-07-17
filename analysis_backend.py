@@ -11,6 +11,9 @@ from openai import OpenAI
 
 from pprint import pprint
 
+import folium
+from math import radians, cos, sin, asin, sqrt
+
 # Constants
 EXIF_GPS_ID = 34853
 EXIF_USER_COMMENT_ID = 37510
@@ -26,8 +29,82 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 OPENAI_API_MODEL = "gpt-5.4-mini"
 OPENAI_VECTOR_STORE_ITEMS = 2
 
+# Clusting Logic
+def haversine(lat1, lon1, lat2, lon2):
+    lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+    dlat, dlon = lat2 - lat1, lon2 - lon1
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    return 2 * 6371 * asin(sqrt(a))  # km
 
-def decode_exif_bytes(raw_comment):
+def cluster_points(points, radius_km=0.5):
+    """Groups nearby points into clusters and returns centroid + count for each."""
+    clusters = []
+    used = [False] * len(points)
+
+    for i, p in enumerate(points):
+        if used[i]:
+            continue
+        group = [p]
+        used[i] = True
+        for j, q in enumerate(points):
+            if not used[j] and haversine(p["lat"], p["lon"], q["lat"], q["lon"]) <= radius_km:
+                group.append(q)
+                used[j] = True
+        avg_lat = sum(pt["lat"] for pt in group) / len(group)
+        avg_lon = sum(pt["lon"] for pt in group) / len(group)
+        clusters.append({"lat": avg_lat, "lon": avg_lon, "count": len(group)})
+
+    return clusters
+
+def get_color(count):
+        return "#ae2012"    # high — red
+
+def get_raw_points(list_of_photos: dict):
+    raw_points = []
+
+    for photo_data in list_of_photos:
+        if photo_data['severity'] == "high" or photo_data['severity'] == "critical":
+            photo_dict = {'lat': photo_data['lat'], 'lon': photo_data['lng']}
+            raw_points.append(photo_dict)
+
+
+    return raw_points
+
+def process_bubble_map(list_of_photos: dict) -> str:
+    raw_points = get_raw_points(list_of_photos)
+    clusters = cluster_points(raw_points, radius_km=0.5)
+    location = [0,0]
+    try:
+        location = [raw_points[0]['lat'], raw_points[0]['lon']]
+    except:
+        pass
+
+    if len(raw_points) == 0:
+        return ""
+    
+    m = folium.Map(location=location, zoom_start=13)
+    for c in clusters:
+        radius = 5 + (c["count"] * 4)   # base size + growth per case
+        folium.CircleMarker(
+            location=[c["lat"], c["lon"]],
+            radius=radius,
+            color="#ae2012",
+            fill=True,
+            fill_color="#ae2012",
+            fill_opacity=0.65,
+            popup=f"High/Critical Cases: {c['count']}",
+            width="100%",
+        ).add_to(m)
+
+    # Force filling the div container
+    m.get_root().width = "100%"
+    m.get_root().height = "100%"
+
+    return m._repr_html_()
+
+
+# Photo Metadata
+def decode_exif_bytes(raw_comment) -> str:
     """Remove starting bytes for json string"""
     if not isinstance(raw_comment, bytes):
         return ""
@@ -78,9 +155,7 @@ def get_photo_metadata(filepath: str) -> list[float]:
 
     return user_metadata
 
-
-
-
+# OpenAI Prompt
 def run_openai(filepath:str, metadata: dict, message: str) -> dict:
 
     with open(filepath, "rb") as f:
@@ -138,7 +213,6 @@ def run(photos: list, message: str, results_folder: str) -> list:
             "location":      {"lat": metadata["lat"], "lng": metadata["lng"]},
             "notes":         (
                 f"Analysis message: {message}\n",
-                f"Confidence: {openai_response['confidence']}\n" 
             ),
         }
 
@@ -156,9 +230,7 @@ def run(photos: list, message: str, results_folder: str) -> list:
 
     return results
 
-
-
-
+# Statistics on Severity
 def count_param(statistics_dict: dict, photo_dict: dict, param: str) -> None:
     if param not in statistics_dict:
         statistics_dict[param] = {}

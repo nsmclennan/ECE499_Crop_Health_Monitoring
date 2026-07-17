@@ -1,33 +1,23 @@
-/* CSS for base template */
-/* Art direction: Crop health monitoring → modern agrarian, field-grounded, honest
-   Palette: warm field greens + wheat/soil neutrals + sky blue accent moments
-   Typography: Fraunces (display — optically variable "wonky" serif, farm-to-table feel) + Epilogue (body — geometric, clean)
-   Density: balanced */
-
+/* General Colouring */
 :root,[data-theme="light"]{
-/* Surfaces — warm parchment/wheat tones */
+
 --color-bg:#EBE5C2;--color-surface:#F8F3D9;--color-surface-2:#fdfcfa;
 --color-surface-offset:#ede9de;--color-surface-offset-2:#e5e0d3;
 --color-surface-dynamic:#dcd6c6;--color-divider:#cec7b4;--color-border:#c4bcaa;
 
-/* Text — warm near-black, ink on parchment */
 --color-text:#504B38;--color-text-muted:#6b6452;--color-text-faint:#a89e8a;
 --color-text-inverse:#f5f2eb;
 
-/* Primary accent — field green */
 --color-primary:#B9B28A;--color-primary-hover:#6d6850;--color-primary-active:#3d3b2d;
 --color-primary-highlight:#c8ddc4;
 
-/* Semantic */
 --color-success:#2e6b3e;--color-success-hover:#1f5230;--color-success-highlight:#c4dac9;
 --color-warning:#a8620a;--color-warning-hover:#8a4e08;--color-warning-highlight:#e8d4b0;
 --color-error:#943028;--color-error-hover:#742420;--color-error-highlight:#e0c8c5;
 
-/* Crop health severity — earthy naturals */
 --color-gold:#8f6e00;--color-gold-highlight:#e8d98a;
 --color-purple:#5c4a82;--color-purple-highlight:#d8d0ec;
 
-/* Shadows — warm soil-tinted */
 --shadow-sm:0 1px 2px oklch(0.22 0.04 80/.07);
 --shadow-md:0 4px 12px oklch(0.22 0.04 80/.10);
 --shadow-lg:0 12px 32px oklch(0.22 0.04 80/.14);
@@ -45,12 +35,6 @@
 
 --transition:180ms cubic-bezier(.16,1,.3,1);
 
-/* Fonts — Fraunces (display) + Epilogue (body)
-   Load in HTML <head>:
-   <link rel="preconnect" href="https://fonts.googleapis.com">
-   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Epilogue:wght@300..700&display=swap" rel="stylesheet">
-*/
 --font-body:'Epilogue',sans-serif;
 --font-display:'Fraunces', serif;
 
@@ -138,8 +122,6 @@ table{border-collapse:collapse;width:100%}
 position:absolute;width:1px;height:1px;padding:0;margin:-1px;
 overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border-width:0
 }
-
-
 
 @media(prefers-reduced-motion:reduce){
 *,*::before,*::after{

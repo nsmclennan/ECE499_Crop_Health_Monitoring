@@ -38,15 +38,19 @@
 <div id="map-outer">
   <div id="map-container"></div>
   <div class="no-map-state" id="no-results-state" style="display:none">
-    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-      <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/>
-    </svg>
     <div>
-      <p style="font-weight:600;margin-bottom:var(--space-2)">No results to display</p>
-      <a href="/analyze" class="btn btn-primary btn-sm">Run Analysis First</a>
+      <a href="/upload" class="btn btn-primary btn-sm">Upload Images First</a>
     </div>
   </div>
 </div>
+
+ {% if map_html %}
+  <div id = "map-outer">
+    <div id="map-container" style="margin-top: 50px">
+      {{ map_html | safe }}
+    </div>
+  </div>
+{% endif %}
 
 <div id="photo-detail-panel" role="complementary" aria-label="Photo details" aria-hidden="true">
   <button id="panel-close" class="btn btn-ghost btn-sm" aria-label="Close panel"

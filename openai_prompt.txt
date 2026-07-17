@@ -17,7 +17,7 @@ Return this JSON schema:
 {
   "powdery_mildew_detected": true|false|null,
   "confidence": 0.0-1.0,
-  "severity": "low|medium|high|uncertain",
+  "severity": "low|medium|high|critical|uncertain",
   "evidence": ["short visual observations"],
   "affected_regions": ["leaf", "shoot", "fruit", "unknown"],
   "alternative_explanations": ["dust", "lighting glare", "other fungus", "none"],

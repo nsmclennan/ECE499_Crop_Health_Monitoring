@@ -3,6 +3,7 @@ import os, uuid
 from pathlib import Path
 from pprint import pprint
 
+
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'uploads')
 app.config['RESULTS_FOLDER'] = os.path.join(os.path.dirname(__file__), 'results')
@@ -88,6 +89,7 @@ def api_results():
 
 @app.route('/map')
 def map_view():
+    # For pin point map + statistics
     statistics_dict = {}
     try:
         import analysis_backend
@@ -97,7 +99,11 @@ def map_view():
         return jsonify({'error': f'Backend error: {str(e)}'}), 500
     
     pprint(statistics_dict, indent=4)
-    return render_template('map.html', statistics = statistics_dict)
+
+    bubble_html = analysis_backend.process_bubble_map(analysis_results)
+
+
+    return render_template('map.html', statistics = statistics_dict, map_html = bubble_html)
 
 @app.route('/results/<path:filename>')
 def serve_result(filename):
